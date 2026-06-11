@@ -113,6 +113,7 @@ export async function startWhatsAppConnection(
     },
     generateHighQualityLinkPreview: true,
     shouldIgnoreJid: (jid) => isJidGroup(jid),
+    browser: ["CRM-MC", "Desktop", "1.0.0"]
   });
 
   sock.ev.process(async (events) => {
