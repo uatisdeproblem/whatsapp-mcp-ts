@@ -135,6 +135,12 @@ export async function startWhatsAppConnection(
       }
 
       if (connection === "close") {
+        // Minimal stderr breadcrumb for operators (pino stays at warn and
+        // doesn't surface lifecycle events). No message content, metadata only.
+        console.error(
+          "[whatsapp-mcp] ✗ Disconnected from WhatsApp:",
+          lastDisconnect?.error?.message ?? "unknown reason"
+        );
         const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
         logger.warn(
           `Connection closed. Reason: ${
@@ -152,6 +158,7 @@ export async function startWhatsAppConnection(
           process.exit(1);
         }
       } else if (connection === "open") {
+        console.error("[whatsapp-mcp] ✓ Connected to WhatsApp");
         logger.info(`Connection opened. WA user: ${sock.user?.name}`);
         // console.log("Logged as", sock.user?.name);
       }
@@ -278,6 +285,9 @@ export async function sendWhatsAppMessage(
     );
     const normalizedJid = jidNormalizedUser(recipientJid);
     const result = await sock.sendMessage(normalizedJid, { text: text });
+    // Security audit trail: every outgoing send leaves a stderr breadcrumb
+    // (recipient jid only, never the body).
+    console.error(`[whatsapp-mcp] → sent message to ${normalizedJid}`);
     logger.info({ msgId: result?.key.id }, "Message sent successfully");
     return result;
   } catch (error) {
