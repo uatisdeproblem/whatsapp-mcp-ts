@@ -6,7 +6,7 @@ import { startMcpServer } from "./mcp.ts";
 const dataDir = process.env.WHATSAPP_MCP_DATA_DIR || '.';
 const waLogger = pino(
   {
-    level: process.env.LOG_LEVEL || "info",
+    level: process.env.LOG_LEVEL || "warn",
     timestamp: pino.stdTimeFunctions.isoTime,
   },
   pino.destination(`${dataDir}/wa-logs.txt`)
@@ -14,7 +14,7 @@ const waLogger = pino(
 
 const mcpLogger = pino(
   {
-    level: process.env.LOG_LEVEL || "info",
+    level: process.env.LOG_LEVEL || "warn",
     timestamp: pino.stdTimeFunctions.isoTime,
   },
   pino.destination(`${dataDir}/mcp-logs.txt`)

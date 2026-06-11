@@ -11,7 +11,8 @@ import {
 } from "@whiskeysockets/baileys";
 import P from "pino";
 import path from "node:path";
-import open from "open";
+// @ts-ignore - qrcode-terminal ships no type declarations
+import qrcode from "qrcode-terminal";
 
 import {
   initializeDatabase,
@@ -120,12 +121,16 @@ export async function startWhatsAppConnection(
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
-        logger.info(
-          { qrCodeData: qr },
-          "QR Code Received. Copy the qrCodeData string and use a QR code generator (e.g., online website) to display and scan it with your WhatsApp app."
-        );
-        // for now we roughly open the QR code in a browser
-        await open(`https://quickchart.io/qr?text=${encodeURIComponent(qr)}`);
+        logger.info("QR Code received. Rendering in terminal (stderr).");
+        // Render the QR locally on stderr — no third-party service, and stdout
+        // stays clean for the MCP JSON-RPC stdio transport.
+        qrcode.generate(qr, { small: true }, (ascii: string) => {
+          process.stderr.write(
+            "\nScan this QR code with WhatsApp (Settings > Linked devices):\n\n" +
+              ascii +
+              "\n"
+          );
+        });
       }
 
       if (connection === "close") {
