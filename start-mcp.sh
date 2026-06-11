@@ -6,8 +6,6 @@
 # companion device, producing a "Stream Errored (conflict)" loop. A PID
 # lockfile lets only the first instance run; later ones exit cleanly.
 
-# Keep the cwd at the script's directory so ./src/main.ts and ./start-mcp.lock
-# resolve correctly regardless of where this is launched from.
 cd "$(dirname "$0")"
 
 LOCKFILE="./start-mcp.lock"
@@ -16,25 +14,19 @@ LOCKFILE="./start-mcp.lock"
 if [ -f "$LOCKFILE" ]; then
   OTHER_PID=$(cat "$LOCKFILE")
   if kill -0 "$OTHER_PID" 2>/dev/null; then
-    # Another instance is genuinely running: bail out with exit 0 so Claude
-    # Desktop does NOT treat this as a failure and retry in a loop.
     echo "[whatsapp-mcp] another instance already running (PID $OTHER_PID), exiting" >&2
     exit 0
   fi
-  # Stale lockfile (owner is gone): remove it and continue.
   rm -f "$LOCKFILE"
 fi
 
-# Claim the lock with our own PID.
+# Claim the lock. We write node's PID (not the wrapper's), so that when node
+# dies the lockfile naturally points to a dead PID and the stale-cleanup above
+# removes it on next launch. We can do this because `exec` replaces the
+# current shell with node — same PID.
 echo "$$" > "$LOCKFILE"
 
-# Launch node as a child (not exec) so this shell stays alive to clean up.
-/usr/local/bin/node ./src/main.ts &
-NODE_PID=$!
-
-# Remove the lockfile on any exit; on Ctrl+C / kill, forward the signal to
-# node first so it shuts down cleanly, then let the EXIT trap remove the lock.
-trap 'rm -f "$LOCKFILE"' EXIT
-trap 'kill -TERM "$NODE_PID" 2>/dev/null' INT TERM
-
-wait "$NODE_PID"
+# Use exec so node inherits stdin/stdout DIRECTLY from Claude Desktop.
+# This is essential for MCP stdio protocol: any shell sitting between Claude
+# and node would break JSON-RPC message passing.
+exec /usr/local/bin/node ./src/main.ts
