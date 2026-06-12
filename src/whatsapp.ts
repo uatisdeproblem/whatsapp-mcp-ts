@@ -26,6 +26,15 @@ const AUTH_DIR = path.join(import.meta.dirname, "..", "auth_info");
 
 export type WhatsAppSocket = ReturnType<typeof makeWASocket>;
 
+// The MCP server must always talk to the LIVE socket: after an automatic
+// reconnect the socket instance changes, but startMcpServer received the old
+// one by value. Consumers should resolve the socket through this holder.
+let currentSocket: WhatsAppSocket | null = null;
+
+export function getCurrentSocket(): WhatsAppSocket | null {
+  return currentSocket;
+}
+
 function parseMessageForDb(msg: WAMessage): DbMessage | null {
   if (!msg.message || !msg.key || !msg.key.remoteJid) {
     return null;
@@ -113,8 +122,14 @@ export async function startWhatsAppConnection(
     },
     generateHighQualityLinkPreview: true,
     shouldIgnoreJid: (jid) => isJidGroup(jid),
-    browser: ["CRM-MC", "Desktop", "1.0.0"]
+    browser: ["CRM-MC", "Desktop", "1.0.0"],
+    // Full history sync only happens in the window right after pairing (QR
+    // scan): without this flag a re-link would leave a permanent hole in the
+    // local DB for everything older than the recent-messages window.
+    syncFullHistory: true,
   });
+
+  currentSocket = sock;
 
   sock.ev.process(async (events) => {
     if (events["connection.update"]) {
@@ -150,7 +165,13 @@ export async function startWhatsAppConnection(
         );
         if (statusCode !== DisconnectReason.loggedOut) {
           logger.info("Reconnecting...");
-          startWhatsAppConnection(logger);
+          // Small delay so a server-side rejection loop (e.g. session
+          // conflict) doesn't turn into a hot reconnect storm.
+          setTimeout(() => {
+            startWhatsAppConnection(logger).catch((err) =>
+              logger.error({ err }, "Reconnection attempt failed")
+            );
+          }, 2000);
         } else {
           logger.error(
             "Connection closed: Logged Out. Please delete auth_info and restart."

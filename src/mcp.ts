@@ -14,7 +14,11 @@ import {
   searchMessages,
 } from "./database.ts";
 
-import { sendWhatsAppMessage, type WhatsAppSocket } from "./whatsapp.ts";
+import {
+  sendWhatsAppMessage,
+  getCurrentSocket,
+  type WhatsAppSocket,
+} from "./whatsapp.ts";
 import { type P } from "pino";
 
 function formatDbMessageForJson(msg: DbMessage) {
@@ -397,7 +401,10 @@ export async function startMcpServer(
     },
     async ({ recipient, message }) => {
       mcpLogger.info(`[MCP Tool] Executing send_message to ${recipient}`);
-      if (!sock) {
+      // Resolve the live socket: after an automatic reconnect the `sock`
+      // captured at startup points to a dead connection.
+      const liveSock = getCurrentSocket() ?? sock;
+      if (!liveSock) {
         mcpLogger.error(
           "[MCP Tool Error] send_message failed: WhatsApp socket is not available.",
         );
@@ -433,7 +440,7 @@ export async function startMcpServer(
       try {
         const result = await sendWhatsAppMessage(
           waLogger,
-          sock,
+          liveSock,
           normalizedRecipient,
           message,
         );

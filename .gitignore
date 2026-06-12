@@ -25,3 +25,7 @@ Thumbs.db
 
 # Single-instance lockfile (start-mcp.sh)
 start-mcp.lock
+# Backup di sicurezza (contengono chiavi private / dati personali)
+auth_info.bak-*/
+auth_info.corrupted-*/
+wa-logs.bak-*.txt
